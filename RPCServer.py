@@ -1,22 +1,55 @@
 import asyncio
+import time
 from rpcudp.protocol import RPCProtocol
 
-
-class Semaphore:
-    def __init__(self):
-        pass
-
-    def acquire(state: int = 1):
-        pass
-    
-    def release(state: int = 1):
-        pass
+semaphoresDictionary = {}
+semaphoreCreateLock = asyncio.Lock()
+semaphoreAcquireLock = asyncio.Lock()
+semaphoreReleaseLock = asyncio.Lock()
 
 class RPCServer(RPCProtocol):
-    # Any methods starting with "rpc_" are available to clients.
-    def rpc_sayhi(self, sender, name):
-        # This could return a Deferred as well. sender is (ip,port)
-        return "Hello %s you live at %s:%i" % (name, sender[0], sender[1])
+
+    async def checkIfSemaphoreExists(ident):
+        exists = False
+        async with semaphoreCreateLock:
+            exist = ident in semaphoresDictionary
+        return exists
+
+    async def rpc_create_semaphore(self, address, ident: int, maxState: int = 1):
+        async with semaphoreCreateLock:
+            if ident in semaphoresDictionary:
+                return False
+            else:
+                semaphoresDictionary[ident] = asyncio.Semaphore(maxState)
+                print("!!!New sempahore with [id={0}|state={1}]".format(ident, maxState))
+                return True
+    
+    async def rpc_acquire(self, address, ident: int, state: int = 1):
+        exists = False
+        async with semaphoreCreateLock:
+            exist = ident in semaphoresDictionary
+        async with semaphoreAcquireLock:
+            if exist:
+                for i in range(state):
+                    await semaphoresDictionary[ident].acquire()
+                    print("@@@Sempahore acquired [id={0}|state={1}]".format(ident, state))
+                return True
+            else:
+                return False
+    
+    async def rpc_release(self, address, ident: int, state: int = 1):
+        exists = False
+        async with semaphoreCreateLock:
+            exists = ident in semaphoresDictionary    
+        async with semaphoreReleaseLock:
+            if exists:
+                for i in range(state):
+                    semaphoresDictionary[ident].release()
+                    print("***Sempahore released [id={0}|state={1}]".format(ident, state))
+                return True
+            else:
+                return False
+
 
 # start a server on UDP port 1234
 loop = asyncio.get_event_loop()
