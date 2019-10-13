@@ -3,38 +3,63 @@ import time
 import sys
 from rpcudp.protocol import RPCProtocol
 
-async def create_semaphore(protocol, address, ident: int, maxState: int = 1):
-    creationResult = await protocol.create_semaphore(address, ident, maxState)
-    print(creationResult[1] if creationResult[0] else "No response received.")
-
-    # creationResult = await protocol.create_semaphore(address, ident, maxState)
-    # print(result[1] if result[0] else "No response received.")    
-
-async def acquire(protocol, address, ident: int, state: int = 1):
-    acquireResult = await protocol.acquire(address, ident, state)
-    print(acquireResult[1] if acquireResult[0] else "No response received.")
-
-async def release(protocol, address, ident: int, state: int = 1):
-    releaseResult = await protocol.release(address, ident, state)
-    print(releaseResult[1] if releaseResult[0] else "No response received.")
 
 # Start local UDP server to be able to handle responses
 loop = asyncio.get_event_loop()
 listen = loop.create_datagram_endpoint(RPCProtocol, local_addr=('127.0.0.1', sys.argv[1]))
 transport, protocol = loop.run_until_complete(listen)
+server_ip = '127.0.0.1'
+server_port = 1234
 
-# Call remote UDP server to say hi
-
-func1 = create_semaphore(protocol, ('127.0.0.1', 1234), 1, 2)
-loop.run_until_complete(func1)
-
-func2 = acquire(protocol, ('127.0.0.1', 1234), 1)
-loop.run_until_complete(func2)
-
-time.sleep(2)
-
-func3 = release(protocol, ('127.0.0.1', 1234), 1)
-loop.run_until_complete(func3)
+async def create(protocol, address, ident: int, maxState: int = 1):
+    creationResult = await protocol.create(address, ident, maxState)
+    if not(creationResult[0]):
+        print("No response received.")
+    else:
+        if creationResult[1]:
+            print("C[{0}|{1}]".format(ident,maxState))
+        else:
+            print("Semaphore {0} already exists".format(ident))
 
 
-#loop.run_forever()
+async def acquire(protocol, address, ident: int, state: int = 1):
+    acquireResult = await protocol.acquire(address, ident, state)
+    if not(acquireResult[0]):
+        print("No response received.")
+    else:
+        if acquireResult[1]:
+            print("P[{0}|{1}]".format(ident,state))
+        else:
+            print("Semaphore {0} does not exist".format(ident))
+
+async def release(protocol, address, ident: int, state: int = 1):
+    releaseResult = await protocol.release(address, ident, state)
+    if not(releaseResult[0]):
+        print("No response received.")
+    else:
+        if releaseResult[1]:
+            print("V[{0}|{1}]".format(ident,state))
+        else:
+            print("Semaphore {0} does not exist".format(ident))
+
+def semaphoreCreate(ident: int, maxState: int = 1):
+    func1 = create(protocol, (server_ip, server_port), ident, maxState)
+    loop.run_until_complete(func1)
+
+def semaphoreAcquire(ident: int, state: int = 1):
+    func2 = acquire(protocol, (server_ip, server_port), ident, state)
+    loop.run_until_complete(func2)
+
+def semaphoreRelease(ident: int, state: int = 1):
+    func3 = release(protocol, (server_ip, server_port), ident, state)
+    loop.run_until_complete(func3)
+
+
+semaphoreCreate(2,1)
+
+while(True):
+    semaphoreAcquire(2,1)
+
+    time.sleep(2)
+
+    semaphoreRelease(2,1)

@@ -9,13 +9,8 @@ semaphoreReleaseLock = asyncio.Lock()
 
 class RPCServer(RPCProtocol):
 
-    async def checkIfSemaphoreExists(ident):
-        exists = False
-        async with semaphoreCreateLock:
-            exist = ident in semaphoresDictionary
-        return exists
 
-    async def rpc_create_semaphore(self, address, ident: int, maxState: int = 1):
+    async def rpc_create(self, address, ident: int, maxState: int = 1):
         async with semaphoreCreateLock:
             if ident in semaphoresDictionary:
                 return False
@@ -34,6 +29,7 @@ class RPCServer(RPCProtocol):
                     await semaphoresDictionary[ident].acquire()
                     print("@@@Sempahore acquired [id={0}|state={1}]".format(ident, state))
                 return True
+                
             else:
                 return False
     
@@ -46,6 +42,7 @@ class RPCServer(RPCProtocol):
                 for i in range(state):
                     semaphoresDictionary[ident].release()
                     print("***Sempahore released [id={0}|state={1}]".format(ident, state))
+                print("--------------------------------------------------")
                 return True
             else:
                 return False
@@ -56,5 +53,3 @@ loop = asyncio.get_event_loop()
 listen = loop.create_datagram_endpoint(RPCServer, local_addr=('127.0.0.1', 1234))
 transport, protocol = loop.run_until_complete(listen)
 loop.run_forever()
-
-
